@@ -26,13 +26,15 @@ const (
     NO_OP State = iota
     BUCKET_NAME
     ADD_BUCKET
+    SET_BUCKET
 )
 
 type bot struct {
 	chatId int64
 	buckets []string
     state State
-    // tmpid string
+    bucket *Bucket
+    curid string
     tmpname string
 	echotron.Api
 }
@@ -111,6 +113,10 @@ func (b *bot) handleMessage(msg string) {
     case "/add_bucket":
         b.SendMessage("What's the ID of the bucket you want to add?", b.chatId)
         b.state = ADD_BUCKET
+
+    case "/set_bucket":
+        b.SendMessage("What's the ID of the bucket you want to use?", b.chatId)
+        b.state = SET_BUCKET
     }
 }
 
@@ -122,7 +128,12 @@ func (b bot) updateCache() {
     }
 }
 
-func (b bot) isIdValid(id string) bool {
+func (b bot) updateBucket() error {
+    return ar.Put(b.curid, *b.bucket)
+}
+
+// Returns true if the given id exists in the buckets db.
+func (b bot) isExistingId(id string) bool {
     kch, err := ar.Keys()
     if err != nil {
         log.Println(err)
@@ -138,6 +149,17 @@ func (b bot) isIdValid(id string) bool {
     return false
 }
 
+// Returns true if the bucket id is associated with the current bot.
+func (b bot) isValidId(id string) bool {
+    for _, i := range b.buckets {
+        if id == i {
+            return true
+        }
+    }
+    return false
+}
+
+// TODO: convert this switch case into a functional approach.
 func (b *bot) Update(update *echotron.Update) {
     var msg = b.extractMessage(update)
 
@@ -155,9 +177,11 @@ func (b *bot) Update(update *echotron.Update) {
         }
         b.buckets = append(b.buckets, id)
         go b.updateCache()
+        b.bucket = &Bucket{Name: msg}
+        b.curid = id
 
         // Save the bucket into the db.
-        if err := ar.Put(id, Bucket{Name: msg}); err == nil {
+        if err := b.updateBucket(); err == nil {
             b.confirmBucket(id, msg)
         } else {
             b.SendMessage("Something went wrong...", b.chatId)
@@ -165,10 +189,26 @@ func (b *bot) Update(update *echotron.Update) {
         b.state = NO_OP
 
     case ADD_BUCKET:
-        if b.isIdValid(msg) {
+        if b.isExistingId(msg) {
             b.buckets = append(b.buckets, msg)
             go b.updateCache()
             b.SendMessage("Bucket added successfully", b.chatId)
+        }
+        b.state = NO_OP
+
+    case SET_BUCKET:
+        if b.isValidId(msg) {
+            bk, err := ar.Get(msg)
+            if err != nil {
+                log.Println(err)
+                b.SendMessage("Something went wrong...", b.chatId)
+                b.state = NO_OP
+                return
+            }
+            b.bucket = &bk
+            b.SendMessage("Bucket set successfully", b.chatId)
+        } else {
+            b.SendMessage("Invalid ID", b.chatId)
         }
         b.state = NO_OP
     }
