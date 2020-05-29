@@ -25,6 +25,7 @@ type State int
 const (
     NO_OP State = iota
     BUCKET_NAME
+    ADD_BUCKET
 )
 
 type bot struct {
@@ -106,11 +107,39 @@ func (b *bot) handleMessage(msg string) {
         for _, bk := range b.buckets {
             b.sendBucketOverview(bk)
         }
+
+    case "/add_bucket":
+        b.SendMessage("What's the ID of the bucket you want to add?", b.chatId)
+        b.state = ADD_BUCKET
     }
 }
 
+// Updates the cache db on the disk.
+func (b bot) updateCache() {
+    if err := cc.Put(b.chatId, b.buckets); err != nil {
+        b.SendMessage("Something went wrong...", b.chatId)
+        log.Println(err)
+    }
+}
+
+func (b bot) isIdValid(id string) bool {
+    kch, err := ar.Keys()
+    if err != nil {
+        log.Println(err)
+        b.SendMessage("Something went wrong...", b.chatId)
+        return false
+    }
+
+    for k := range kch {
+        if id == string(k) {
+            return true
+        }
+    }
+    return false
+}
+
 func (b *bot) Update(update *echotron.Update) {
-    msg := b.extractMessage(update)
+    var msg = b.extractMessage(update)
 
 	switch b.state {
     case NO_OP:
@@ -125,20 +154,21 @@ func (b *bot) Update(update *echotron.Update) {
             return
         }
         b.buckets = append(b.buckets, id)
-
-        // Add the id to the cache and associate it with the bot chatId.
-        err = cc.Put(b.chatId, b.buckets)
-        if err != nil {
-            b.SendMessage("Something went wrong...", b.chatId)
-            log.Println(err)
-            return
-        }
+        go b.updateCache()
 
         // Save the bucket into the db.
         if err := ar.Put(id, Bucket{Name: msg}); err == nil {
             b.confirmBucket(id, msg)
         } else {
             b.SendMessage("Something went wrong...", b.chatId)
+        }
+        b.state = NO_OP
+
+    case ADD_BUCKET:
+        if b.isIdValid(msg) {
+            b.buckets = append(b.buckets, msg)
+            go b.updateCache()
+            b.SendMessage("Bucket added successfully", b.chatId)
         }
         b.state = NO_OP
     }
