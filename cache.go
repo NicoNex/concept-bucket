@@ -18,7 +18,7 @@ func itob(i int64) []byte {
 }
 
 // Put saves a list of bucket tokens associated to a provided chatId.
-func (c Cache) Put(id int64, data []string) error {
+func (c Cache) Put(id int64, data Data) error {
 	var buf bytes.Buffer
 	var enc = gob.NewEncoder(&buf)
 
@@ -36,9 +36,9 @@ func (c Cache) Put(id int64, data []string) error {
 }
 
 // Get retrieves the list of bucket tokens associated to the given chatId.
-func (c Cache) Get(id int64) ([]string, error) {
+func (c Cache) Get(id int64) (Data, error) {
 	var buf bytes.Buffer
-	var ret []string
+	var ret Data
 	var dec = gob.NewDecoder(&buf)
 
 	db, err := bitcask.Open(string(c))

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/NicoNex/echotron"
@@ -21,13 +20,18 @@ type Concept struct {
 	Date  int64
 }
 
+// Struct representing the data cached on the disk for each bot.
+type Data struct {
+	Buckets []string
+	Curid   string
+}
+
 type bot struct {
-	chatId  int64
-	buckets []string
-	state   stateFn
-	bucket  *Bucket
-	curid   string
-	tmpname string
+	chatId int64
+	data   Data
+	state  stateFn
+	bucket *Bucket
+	tmp    string
 	echotron.Api
 }
 
@@ -38,24 +42,33 @@ var cc Cache
 var ar Archive
 var sid *shortid.Shortid
 
-func die(a ...interface{}) {
-	log.Println(a...)
-	os.Exit(1)
-}
-
 func newBot(api echotron.Api, chatId int64) echotron.Bot {
-	bs, err := cc.Get(chatId)
+	data, err := cc.Get(chatId)
 	if err != nil {
-		log.Println(err)
+		log.Println("newBot", err)
 	}
 
 	b := &bot{
-		chatId:  chatId,
-		buckets: bs,
-		Api:     api,
+		chatId: chatId,
+		data:   data,
+		Api:    api,
 	}
 	b.state = b.handleMessage
+	b.loadBucket()
 	return b
+}
+
+func (b *bot) loadBucket() {
+	var id = b.data.Curid
+
+	if id != "" {
+		bk, err := ar.Get(id)
+		if err != nil {
+			log.Println("loadBucket", err)
+			return
+		}
+		b.bucket = &bk
+	}
 }
 
 // Returns the message from the given update.
@@ -83,7 +96,7 @@ func (b bot) confirmBucket(id, name string) {
 func (b bot) sendBucketOverview(id string) {
 	bk, err := ar.Get(id)
 	if err != nil {
-		log.Println(err)
+		log.Println("sendBucketOverview", err)
 		b.SendMessage("Something went wrong...", b.chatId)
 		return
 	}
@@ -95,25 +108,33 @@ func (b bot) sendBucketOverview(id string) {
 	)
 }
 
+func (b bot) sendConcept(c Concept) {
+	b.SendMessageOptions(
+		fmt.Sprintf("*%s*\n\n%s", c.Title, c.Body),
+		b.chatId,
+		echotron.PARSE_MARKDOWN,
+	)
+}
+
 // Creates a new bucket and saves the relative data onto the disk.
 func (b *bot) newBucket(update *echotron.Update) stateFn {
-	var msg = b.extractMessage(update)
+	var name = b.extractMessage(update)
 
 	// Generate the id of the bucket.
 	id, err := sid.Generate()
 	if err != nil {
 		b.SendMessage("Something went wrong...", b.chatId)
-		log.Println(err)
+		log.Println("newBucket", err)
 		return b.handleMessage
 	}
-	b.buckets = append(b.buckets, id)
-	go b.updateCache()
-	b.bucket = &Bucket{Name: msg}
-	b.curid = id
+	b.data.Buckets = append(b.data.Buckets, id)
+	b.data.Curid = id
+	go b.updateData()
+	b.bucket = &Bucket{Name: name}
 
 	// Save the bucket into the db.
 	if err := b.updateBucket(); err == nil {
-		b.confirmBucket(id, msg)
+		b.confirmBucket(id, name)
 	} else {
 		b.SendMessage("Something went wrong...", b.chatId)
 	}
@@ -122,11 +143,11 @@ func (b *bot) newBucket(update *echotron.Update) stateFn {
 
 // Adds a bucket from its ID.
 func (b *bot) addBucket(update *echotron.Update) stateFn {
-	var msg = b.extractMessage(update)
+	var id = b.extractMessage(update)
 
-	if b.isExistingId(msg) {
-		b.buckets = append(b.buckets, msg)
-		go b.updateCache()
+	if b.isExistingId(id) {
+		b.data.Buckets = append(b.data.Buckets, id)
+		go b.updateData()
 		b.SendMessage("Bucket added successfully", b.chatId)
 	}
 	return b.handleMessage
@@ -134,21 +155,46 @@ func (b *bot) addBucket(update *echotron.Update) stateFn {
 
 // Sets the currently-in-use bucket.
 func (b *bot) setBucket(update *echotron.Update) stateFn {
-	var msg = b.extractMessage(update)
+	var id = b.extractMessage(update)
 
-	if b.isValidId(msg) {
-		bk, err := ar.Get(msg)
+	if b.isValidId(id) {
+		bk, err := ar.Get(id)
 		if err != nil {
-			log.Println(err)
+			log.Println("setBucket", err)
 			b.SendMessage("Something went wrong...", b.chatId)
 			return b.handleMessage
 		}
 		b.bucket = &bk
+		b.data.Curid = id
+		go b.updateData()
 		b.SendMessage("Bucket set successfully", b.chatId)
 	} else {
 		b.SendMessage("Invalid ID", b.chatId)
 	}
 
+	return b.handleMessage
+}
+
+func (b *bot) newConceptTitle(update *echotron.Update) stateFn {
+	b.tmp = b.extractMessage(update)
+	b.SendMessage("What's the new concept?", b.chatId)
+	return b.newConceptBody
+}
+
+func (b *bot) newConceptBody(update *echotron.Update) stateFn {
+	var body = b.extractMessage(update)
+
+	if b.bucket.Concepts == nil {
+		b.bucket.Concepts = make(map[string]Concept)
+	}
+
+	b.bucket.Concepts[b.tmp] = Concept{
+		Title: b.tmp,
+		Body:  body,
+		Date:  time.Now().Unix(),
+	}
+	go b.updateBucket()
+	b.SendMessage("Concept added successfully", b.chatId)
 	return b.handleMessage
 }
 
@@ -164,8 +210,12 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 		return b.newBucket
 
 	case "/my_buckets":
-		for _, bk := range b.buckets {
-			b.sendBucketOverview(bk)
+		if b.data.Buckets != nil && len(b.data.Buckets) > 0 {
+			for _, bk := range b.data.Buckets {
+				b.sendBucketOverview(bk)
+			}
+		} else {
+			b.SendMessage("You have no bucket", b.chatId)
 		}
 
 	case "/add_bucket":
@@ -175,28 +225,45 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	case "/set_bucket":
 		b.SendMessage("What's the ID of the bucket you want to use?", b.chatId)
 		return b.setBucket
+
+	case "/new_concept":
+		if b.bucket != nil {
+			b.SendMessage("What's the title of the new concept?", b.chatId)
+			return b.newConceptTitle
+		}
+		b.SendMessage("No bucket selected, please select or create one first", b.chatId)
+
+	case "/my_concepts":
+		if b.bucket != nil {
+			for _, c := range b.bucket.Concepts {
+				b.sendConcept(c)
+			}
+		} else {
+			b.SendMessage("No bucket selected, please select or create one first", b.chatId)
+		}
 	}
+
 	return b.handleMessage
 }
 
 // Updates the cache db on the disk.
-func (b bot) updateCache() {
-	if err := cc.Put(b.chatId, b.buckets); err != nil {
+func (b bot) updateData() {
+	if err := cc.Put(b.chatId, b.data); err != nil {
 		b.SendMessage("Something went wrong...", b.chatId)
-		log.Println(err)
+		log.Println("updateData", err)
 	}
 }
 
 // Syncs the current bucket in use with the database.
 func (b bot) updateBucket() error {
-	return ar.Put(b.curid, *b.bucket)
+	return ar.Put(b.data.Curid, *b.bucket)
 }
 
 // Returns true if the given id exists in the buckets db.
 func (b bot) isExistingId(id string) bool {
 	kch, err := ar.Keys()
 	if err != nil {
-		log.Println(err)
+		log.Println("isExistingId", err)
 		b.SendMessage("Something went wrong...", b.chatId)
 		return false
 	}
@@ -211,7 +278,7 @@ func (b bot) isExistingId(id string) bool {
 
 // Returns true if the bucket id is associated with the current bot.
 func (b bot) isValidId(id string) bool {
-	for _, i := range b.buckets {
+	for _, i := range b.data.Buckets {
 		if id == i {
 			return true
 		}
