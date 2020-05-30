@@ -236,6 +236,7 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 		b.SendMessage("No bucket selected, please select or create one first", b.chatId)
 
 	case "/my_concepts":
+		b.loadBucket()
 		if b.bucket != nil {
 			if len(b.bucket.Concepts) > 0 {
 				for _, c := range b.bucket.Concepts {
