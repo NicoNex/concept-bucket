@@ -203,6 +203,7 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	switch b.extractMessage(update) {
 
 	case "/start":
+		// TODO: add a decent welcome message.
 		b.SendMessage("I'm alive", b.chatId)
 
 	case "/new_bucket":
@@ -288,6 +289,12 @@ func (b bot) isValidId(id string) bool {
 
 // I think we all know what this function does.
 func (b *bot) Update(update *echotron.Update) {
+	// The command '/dismiss' needs to take precedence over everything.
+	if msg := b.extractMessage(update); msg == "/dismiss" {
+		b.SendMessage("Action dismissed", b.chatId)
+		b.state = b.handleMessage
+		return
+	}
 	b.state = b.state(update)
 }
 
