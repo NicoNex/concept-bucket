@@ -1,17 +1,17 @@
 package main
 
 import (
-	"log"
 	"fmt"
-	"time"
+	"log"
 	"os"
+	"time"
 
-	"github.com/teris-io/shortid"
 	"github.com/NicoNex/echotron"
+	"github.com/teris-io/shortid"
 )
 
 type Bucket struct {
-	Name string
+	Name     string
 	Concepts map[string]Concept
 }
 
@@ -22,11 +22,11 @@ type Concept struct {
 }
 
 type bot struct {
-	chatId int64
+	chatId  int64
 	buckets []string
-	state stateFn
-	bucket *Bucket
-	curid string
+	state   stateFn
+	bucket  *Bucket
+	curid   string
 	tmpname string
 	echotron.Api
 }
@@ -50,9 +50,9 @@ func newBot(api echotron.Api, chatId int64) echotron.Bot {
 	}
 
 	b := &bot{
-		chatId: chatId,
+		chatId:  chatId,
 		buckets: bs,
-		Api: api,
+		Api:     api,
 	}
 	b.state = b.handleMessage
 	return b

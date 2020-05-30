@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"strconv"
 	"encoding/gob"
+	"strconv"
 
 	"github.com/prologic/bitcask"
 )
