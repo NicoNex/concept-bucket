@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/NicoNex/echotron"
@@ -236,8 +237,12 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 
 	case "/my_concepts":
 		if b.bucket != nil {
-			for _, c := range b.bucket.Concepts {
-				b.sendConcept(c)
+			if len(b.bucket.Concepts) > 0 {
+				for _, c := range b.bucket.Concepts {
+					b.sendConcept(c)
+				}
+			} else {
+				b.SendMessage("The bucket is empty", b.chatId)
 			}
 		} else {
 			b.SendMessage("No bucket selected, please select or create one first", b.chatId)
@@ -299,11 +304,13 @@ func (b *bot) Update(update *echotron.Update) {
 }
 
 func main() {
-	cc = Cache("./cache")
-	ar = Archive("./buckets")
+	var home = os.Getenv("HOME")
+
+	cc = Cache(fmt.Sprintf("%s/.cache/concept-bucket/cache", home))
+	ar = Archive(fmt.Sprintf("%s/.cache/concept-bucket/buckets", home))
 	sid = shortid.MustNew(0, shortid.DefaultABC, uint64(time.Now().Unix()))
 	dsp := echotron.NewDispatcher(
-		"568059758:AAG32AudAzQyh_KEDqOsMSECbOgXY5fyu6U",
+		"785597570:AAFtVWSLzQxCfQatU7RNOBMsTLyH2z5dVPA",
 		newBot,
 	)
 	dsp.Run()
