@@ -31,6 +31,7 @@ type bot struct {
 	echotron.Api
 }
 
+// Recursive definition of the state-function type.
 type stateFn func(*echotron.Update) stateFn
 
 var cc Cache
@@ -40,16 +41,6 @@ var sid *shortid.Shortid
 func die(a ...interface{}) {
 	log.Println(a...)
 	os.Exit(1)
-}
-
-func (b bot) extractMessage(update *echotron.Update) string {
-	if update.Message != nil {
-		return update.Message.Text
-	} else if update.EditedMessage != nil {
-		return update.EditedMessage.Text
-	} else {
-		return ""
-	}
 }
 
 func newBot(api echotron.Api, chatId int64) echotron.Bot {
@@ -67,6 +58,19 @@ func newBot(api echotron.Api, chatId int64) echotron.Bot {
 	return b
 }
 
+// Returns the message from the given update.
+func (b bot) extractMessage(update *echotron.Update) string {
+	// Some defensive programming here...
+	if update.Message != nil {
+		return update.Message.Text
+	} else if update.EditedMessage != nil {
+		return update.EditedMessage.Text
+	} else {
+		return ""
+	}
+}
+
+// Sends a confirmation message for the newly created bucket.
 func (b bot) confirmBucket(id, name string) {
 	b.SendMessageOptions(
 		fmt.Sprintf("New bucket created!\n\nName: *%s*\nID: *%s*", name, id),
@@ -75,6 +79,7 @@ func (b bot) confirmBucket(id, name string) {
 	)
 }
 
+// Sends an overview of the bucket associated with the provided id.
 func (b bot) sendBucketOverview(id string) {
 	bk, err := ar.Get(id)
 	if err != nil {
@@ -90,6 +95,7 @@ func (b bot) sendBucketOverview(id string) {
 	)
 }
 
+// Creates a new bucket and saves the relative data onto the disk.
 func (b *bot) newBucket(update *echotron.Update) stateFn {
 	var msg = b.extractMessage(update)
 
@@ -114,6 +120,7 @@ func (b *bot) newBucket(update *echotron.Update) stateFn {
 	return b.handleMessage
 }
 
+// Adds a bucket from its ID.
 func (b *bot) addBucket(update *echotron.Update) stateFn {
 	var msg = b.extractMessage(update)
 
@@ -125,6 +132,7 @@ func (b *bot) addBucket(update *echotron.Update) stateFn {
 	return b.handleMessage
 }
 
+// Sets the currently-in-use bucket.
 func (b *bot) setBucket(update *echotron.Update) stateFn {
 	var msg = b.extractMessage(update)
 
@@ -144,6 +152,7 @@ func (b *bot) setBucket(update *echotron.Update) stateFn {
 	return b.handleMessage
 }
 
+// Handles the messages when the bot is in its normal state.
 func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	switch b.extractMessage(update) {
 
@@ -178,6 +187,7 @@ func (b bot) updateCache() {
 	}
 }
 
+// Syncs the current bucket in use with the database.
 func (b bot) updateBucket() error {
 	return ar.Put(b.curid, *b.bucket)
 }
@@ -209,6 +219,7 @@ func (b bot) isValidId(id string) bool {
 	return false
 }
 
+// I think we all know what this function does.
 func (b *bot) Update(update *echotron.Update) {
 	b.state = b.state(update)
 }
