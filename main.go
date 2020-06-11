@@ -73,7 +73,7 @@ func (b *bot) loadBucket() {
 }
 
 // Returns the message from the given update.
-func (b bot) extractMessage(update *echotron.Update) string {
+func extractMessage(update *echotron.Update) string {
 	// Some defensive programming here...
 	if update.Message != nil {
 		return update.Message.Text
@@ -119,7 +119,7 @@ func (b bot) sendConcept(c Concept) {
 
 // Creates a new bucket and saves the relative data onto the disk.
 func (b *bot) newBucket(update *echotron.Update) stateFn {
-	var name = b.extractMessage(update)
+	var name = extractMessage(update)
 
 	// Generate the id of the bucket.
 	id, err := sid.Generate()
@@ -144,7 +144,7 @@ func (b *bot) newBucket(update *echotron.Update) stateFn {
 
 // Adds a bucket from its ID.
 func (b *bot) addBucket(update *echotron.Update) stateFn {
-	var id = b.extractMessage(update)
+	var id = extractMessage(update)
 
 	if b.isExistingId(id) {
 		b.data.Buckets = append(b.data.Buckets, id)
@@ -156,7 +156,7 @@ func (b *bot) addBucket(update *echotron.Update) stateFn {
 
 // Sets the currently-in-use bucket.
 func (b *bot) setBucket(update *echotron.Update) stateFn {
-	var id = b.extractMessage(update)
+	var id = extractMessage(update)
 
 	if b.isValidId(id) {
 		bk, err := ar.Get(id)
@@ -177,13 +177,13 @@ func (b *bot) setBucket(update *echotron.Update) stateFn {
 }
 
 func (b *bot) newConceptTitle(update *echotron.Update) stateFn {
-	b.tmp = b.extractMessage(update)
+	b.tmp = extractMessage(update)
 	b.SendMessage("What's the new concept?", b.chatId)
 	return b.newConceptBody
 }
 
 func (b *bot) newConceptBody(update *echotron.Update) stateFn {
-	var body = b.extractMessage(update)
+	var body = extractMessage(update)
 
 	if b.bucket.Concepts == nil {
 		b.bucket.Concepts = make(map[string]Concept)
@@ -201,7 +201,7 @@ func (b *bot) newConceptBody(update *echotron.Update) stateFn {
 
 // Handles the messages when the bot is in its normal state.
 func (b *bot) handleMessage(update *echotron.Update) stateFn {
-	switch b.extractMessage(update) {
+	switch extractMessage(update) {
 
 	case "/start":
 		// TODO: add a decent welcome message.
@@ -296,7 +296,7 @@ func (b bot) isValidId(id string) bool {
 // I think we all know what this function does.
 func (b *bot) Update(update *echotron.Update) {
 	// The command '/dismiss' needs to take precedence over everything.
-	if msg := b.extractMessage(update); msg == "/dismiss" {
+	if msg := extractMessage(update); msg == "/dismiss" {
 		b.SendMessage("Action dismissed", b.chatId)
 		b.state = b.handleMessage
 		return
