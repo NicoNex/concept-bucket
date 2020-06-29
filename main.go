@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/NicoNex/echotron"
@@ -311,6 +313,14 @@ func (b *bot) Update(update *echotron.Update) {
 	b.state = b.state(update)
 }
 
+func readToken(fpath string) string {
+	b, err := ioutil.ReadFile(fpath)
+	if err != nil {
+		log.Fatalf("Could not read token file at path %s", fpath)
+	}
+	return strings.ReplaceAll(string(b), "\n", "")
+}
+
 func main() {
 	var home = os.Getenv("HOME")
 
@@ -318,8 +328,7 @@ func main() {
 	ar = Archive(fmt.Sprintf("%s/.cache/concept-bucket/buckets", home))
 	sid = shortid.MustNew(0, shortid.DefaultABC, uint64(time.Now().Unix()))
 	dsp := echotron.NewDispatcher(
-		"568059758:AAG32AudAzQyh_KEDqOsMSECbOgXY5fyu6U",
-		// "785597570:AAFtVWSLzQxCfQatU7RNOBMsTLyH2z5dVPA",
+		readToken(fmt.Sprintf("%s/.config/concept-bucket", home)),
 		newBot,
 	)
 	dsp.Run()
