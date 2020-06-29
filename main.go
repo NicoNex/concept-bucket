@@ -104,7 +104,7 @@ func (b bot) sendBucketOverview(id string) {
 	}
 
 	b.SendMessageOptions(
-		fmt.Sprintf("Name: *%s*\nID: *%s*", bk.Name, id),
+		fmt.Sprintf("Name: *%s*\nID: `%s`", bk.Name, id),
 		b.chatId,
 		echotron.PARSE_MARKDOWN,
 	)
@@ -248,6 +248,13 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 		} else {
 			b.SendMessage("No bucket selected, please select or create one first", b.chatId)
 		}
+
+	case "/which_bucket":
+		if id := b.data.Curid; id != "" {
+			b.sendBucketOverview(id)
+		} else {
+			b.SendMessage("No bucket selected, please select or create one first", b.chatId)
+		}
 	}
 
 	return b.handleMessage
@@ -329,8 +336,7 @@ func main() {
 	ar = Archive(fmt.Sprintf("%s/.cache/concept-bucket/buckets", home))
 	sid = shortid.MustNew(0, shortid.DefaultABC, uint64(time.Now().Unix()))
 	dsp := echotron.NewDispatcher(
-		// stegotron
-		"710587307:AAGA6LUgaAuunwLQMyXH8hb3lnhetr4ZU9o",
+		readToken(fmt.Sprintf("%s/.config/concept-bucket", home)),
 		newBot,
 	)
 	dsp.Run()
