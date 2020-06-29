@@ -60,6 +60,7 @@ func newBot(api echotron.Api, chatId int64) echotron.Bot {
 }
 
 func (b *bot) loadBucket() {
+	// holds the id of the bucket currently used
 	var id = b.data.Curid
 
 	if id != "" {
@@ -204,14 +205,13 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	switch extractMessage(update) {
 
 	case "/start":
-		// TODO: add a decent welcome message.
-		b.SendMessage("I'm alive", b.chatId)
+		b.welcomeMessage()
 
-	case "/new_bucket":
+	case "🆕 New bucket":
 		b.SendMessage("What's the name of the bucket?", b.chatId)
 		return b.newBucket
 
-	case "/my_buckets":
+	case "🗑 My buckets":
 		if b.data.Buckets != nil && len(b.data.Buckets) > 0 {
 			for _, bk := range b.data.Buckets {
 				b.sendBucketOverview(bk)
@@ -220,22 +220,22 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 			b.SendMessage("You have no bucket", b.chatId)
 		}
 
-	case "/add_bucket":
+	case "➕ Add bucket":
 		b.SendMessage("What's the ID of the bucket you want to add?", b.chatId)
 		return b.addBucket
 
-	case "/set_bucket":
+	case "☑️ Set bucket":
 		b.SendMessage("What's the ID of the bucket you want to use?", b.chatId)
 		return b.setBucket
 
-	case "/new_concept":
+	case "💡 New concept":
 		if b.bucket != nil {
 			b.SendMessage("What's the title of the new concept?", b.chatId)
 			return b.newConceptTitle
 		}
 		b.SendMessage("No bucket selected, please select or create one first", b.chatId)
 
-	case "/my_concepts":
+	case "📝 My concepts":
 		b.loadBucket()
 		if b.bucket != nil {
 			if len(b.bucket.Concepts) > 0 {
@@ -251,6 +251,24 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	}
 
 	return b.handleMessage
+}
+
+func (b bot) welcomeMessage() {
+	// now i generate a keyboard
+	kbd := b.KeyboardMarkup(false, true, false,
+		b.KeyboardRow(
+			b.KeyboardButton("🆕 New bucket", false, false),
+			b.KeyboardButton("🗑 My buckets", false, false)),
+		b.KeyboardRow(
+			b.KeyboardButton("➕ Add bucket", false, false),
+			b.KeyboardButton("☑️ Set bucket", false, false)),
+		b.KeyboardRow(
+			b.KeyboardButton("💡 New concept", false, false),
+			b.KeyboardButton("📝 My concepts", false, false)),
+		b.KeyboardRow(
+			b.KeyboardButton("❌ Cancel", false, false)),
+	)
+	b.SendMessageWithKeyboard("Welcome to Concept Bucket!", b.chatId, kbd)
 }
 
 // Updates the cache db on the disk.
@@ -295,9 +313,9 @@ func (b bot) isValidId(id string) bool {
 
 // I think we all know what this function does.
 func (b *bot) Update(update *echotron.Update) {
-	// The command '/dismiss' needs to take precedence over everything.
-	if msg := extractMessage(update); msg == "/dismiss" {
-		b.SendMessage("Action dismissed", b.chatId)
+	// The command '❌ Cancel' needs to take precedence over everything.
+	if msg := extractMessage(update); msg == "❌ Cancel" {
+		b.SendMessage("Action cancelled", b.chatId)
 		b.state = b.handleMessage
 		return
 	}
@@ -311,7 +329,8 @@ func main() {
 	ar = Archive(fmt.Sprintf("%s/.cache/concept-bucket/buckets", home))
 	sid = shortid.MustNew(0, shortid.DefaultABC, uint64(time.Now().Unix()))
 	dsp := echotron.NewDispatcher(
-		"785597570:AAFtVWSLzQxCfQatU7RNOBMsTLyH2z5dVPA",
+		// stegotron
+		"710587307:AAGA6LUgaAuunwLQMyXH8hb3lnhetr4ZU9o",
 		newBot,
 	)
 	dsp.Run()
