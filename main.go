@@ -249,7 +249,7 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 			b.SendMessage("No bucket selected, please select or create one first", b.chatId)
 		}
 
-	case "/which_bucket":
+	case "❓ Which bucket":
 		if id := b.data.Curid; id != "" {
 			b.sendBucketOverview(id)
 		} else {
@@ -260,20 +260,26 @@ func (b *bot) handleMessage(update *echotron.Update) stateFn {
 	return b.handleMessage
 }
 
+// Sends the welcome message and the bot keyboard.
 func (b bot) welcomeMessage() {
-	// now i generate a keyboard
+	// Generate the keyboard
 	kbd := b.KeyboardMarkup(false, true, false,
 		b.KeyboardRow(
 			b.KeyboardButton("🆕 New bucket", false, false),
-			b.KeyboardButton("🗑 My buckets", false, false)),
+			b.KeyboardButton("🗑 My buckets", false, false),
+		),
 		b.KeyboardRow(
 			b.KeyboardButton("➕ Add bucket", false, false),
-			b.KeyboardButton("☑️ Set bucket", false, false)),
+			b.KeyboardButton("☑️ Set bucket", false, false),
+		),
 		b.KeyboardRow(
 			b.KeyboardButton("💡 New concept", false, false),
-			b.KeyboardButton("📝 My concepts", false, false)),
+			b.KeyboardButton("📝 My concepts", false, false),
+		),
 		b.KeyboardRow(
-			b.KeyboardButton("❌ Cancel", false, false)),
+			b.KeyboardButton("❓ Which bucket", false, false),
+			b.KeyboardButton("❌ Cancel", false, false),
+		),
 	)
 	b.SendMessageWithKeyboard("Welcome to Concept Bucket!", b.chatId, kbd)
 }
