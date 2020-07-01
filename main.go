@@ -88,7 +88,7 @@ func extractMessage(update *echotron.Update) string {
 // Sends a confirmation message for the newly created bucket.
 func (b bot) confirmBucket(id, name string) {
 	b.SendMessageOptions(
-		fmt.Sprintf("New bucket created!\n\nName: *%s*\nID: *%s*", name, id),
+		fmt.Sprintf("New bucket created!\n\nName: *%s*\nID: `%s`", name, id),
 		b.chatId,
 		echotron.PARSE_MARKDOWN,
 	)
